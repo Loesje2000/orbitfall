@@ -87,14 +87,17 @@ void OrbitfallAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    if (toggle ("bypass"))
+        return;
+
     auto* left = buffer.getWritePointer (0);
     auto* right = buffer.getWritePointer (1);
     const auto sr = getSampleRate() > 0.0 ? getSampleRate() : 48000.0;
 
     const auto preTypeValue = choice ("pre_type");
-    const auto preTime = pctToMs (param ("pre_time"));
-    const auto preFeedback = param ("pre_feedback");
-    const auto preCrossfeed = param ("pre_crossfeed");
+    auto preTime = pctToMs (param ("pre_time"));
+    auto preFeedback = param ("pre_feedback");
+    auto preCrossfeed = param ("pre_crossfeed");
     const auto preMod = param ("pre_mod");
     const auto halfSpeed = toggle ("pre_half_speed");
     const auto dryBlend = param ("pre_dry_blend");
@@ -102,11 +105,26 @@ void OrbitfallAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     const auto algorithmValue = choice ("reverb_algorithm");
     auto reverbDecay = param ("reverb_decay");
     const auto reverbSize = param ("reverb_size");
-    const auto reverbDiffusion = param ("reverb_diffusion");
-    const auto reverbLo = param ("reverb_lo_freq");
-    const auto reverbHi = param ("reverb_hi_freq");
+    auto reverbDiffusion = param ("reverb_diffusion");
+    auto reverbLo = param ("reverb_lo_freq");
+    auto reverbHi = param ("reverb_hi_freq");
     auto reverbPitch = param ("reverb_pitch");
     const auto reverbPitchMix = param ("reverb_pitch_mix");
+
+    auto gateAttack = param ("gate_attack");
+    auto gateHold = param ("gate_hold");
+    const auto gateDecay = param ("gate_decay");
+    const auto insertTypeValue = choice ("insert_type");
+    auto insertAmount = param ("insert_amount");
+    const auto insertMix = param ("insert_mix");
+    const auto insertParam = param ("insert_param");
+    auto hazyAge = param ("hazy_age");
+    const auto hazyWarble = param ("hazy_warble");
+    const auto hazyDecimate = param ("hazy_decimate");
+    const auto hazyMix = param ("hazy_mix");
+    const auto mix = param ("mix");
+    const auto dryTrim = juce::Decibels::decibelsToGain (juce::jmap (param ("dry_trim"), -24.0f, 6.0f));
+    const auto wetTrim = juce::Decibels::decibelsToGain (juce::jmap (param ("wet_trim"), -24.0f, 6.0f));
 
     const auto inputLevel = buffer.getMagnitude (0, buffer.getNumSamples());
     const auto modAValue = modA.process (choice ("mod_a_type"), param ("mod_a_rate"), param ("mod_a_depth"),
@@ -116,26 +134,25 @@ void OrbitfallAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
 
     auto applyMod = [&] (int target, float value)
     {
-        if (target == 0) reverbDecay = juce::jlimit (0.0f, 1.0f, reverbDecay * (1.0f + value));
-        if (target == 2) reverbPitch = juce::jlimit (-12.0f, 12.0f, reverbPitch * (1.0f + value));
+        switch (target)
+        {
+            case 0: reverbDecay = juce::jlimit (0.0f, 1.0f, reverbDecay + value * 0.35f); break;
+            case 1: preTime = juce::jlimit (1.0f, 2500.0f, preTime * std::pow (2.0f, value * 2.0f)); break;
+            case 2: reverbPitch = juce::jlimit (-12.0f, 12.0f, reverbPitch + value * 12.0f); break;
+            case 3: reverbDiffusion = juce::jlimit (0.0f, 1.0f, reverbDiffusion + value * 0.5f); break;
+            case 4: reverbLo = juce::jlimit (0.0f, 1.0f, reverbLo + value * 0.5f); break;
+            case 5: reverbHi = juce::jlimit (0.0f, 1.0f, reverbHi + value * 0.5f); break;
+            case 6: preFeedback = juce::jlimit (0.0f, 1.0f, preFeedback + value * 0.5f); break;
+            case 7: preCrossfeed = juce::jlimit (0.0f, 1.0f, preCrossfeed + value * 0.5f); break;
+            case 8: gateAttack = juce::jlimit (0.0f, 1.0f, gateAttack + value * 0.5f); break;
+            case 9: gateHold = juce::jlimit (0.0f, 1.0f, gateHold + value * 0.5f); break;
+            case 10: insertAmount = juce::jlimit (0.0f, 1.0f, insertAmount + value * 0.5f); break;
+            case 11: hazyAge = juce::jlimit (0.0f, 1.0f, hazyAge + value * 0.5f); break;
+            default: break;
+        }
     };
     applyMod (choice ("mod_a_target"), modAValue);
     applyMod (choice ("mod_b_target"), modBValue);
-
-    const auto gateAttack = param ("gate_attack");
-    const auto gateHold = param ("gate_hold");
-    const auto gateDecay = param ("gate_decay");
-    const auto insertTypeValue = choice ("insert_type");
-    const auto insertAmount = param ("insert_amount");
-    const auto insertMix = param ("insert_mix");
-    const auto insertParam = param ("insert_param");
-    const auto hazyAge = param ("hazy_age");
-    const auto hazyWarble = param ("hazy_warble");
-    const auto hazyDecimate = param ("hazy_decimate");
-    const auto hazyMix = param ("hazy_mix");
-    const auto mix = param ("mix");
-    const auto dryTrim = juce::Decibels::decibelsToGain (juce::jmap (param ("dry_trim"), -24.0f, 6.0f));
-    const auto wetTrim = juce::Decibels::decibelsToGain (juce::jmap (param ("wet_trim"), -24.0f, 6.0f));
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
@@ -150,10 +167,22 @@ void OrbitfallAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         const auto tankInR = (1.0f - dryBlend) * preR + dryBlend * dryR;
 
         float wetL = 0.0f, wetR = 0.0f;
-        if (algorithmValue == 2)
+        if (algorithmValue == 1)
+            reverb.processHall78 (tankInL, tankInR, wetL, wetR, reverbDecay * 0.82f, reverbLo * 0.55f,
+                                  juce::jlimit (0.0f, 1.0f, reverbHi + 0.18f), reverbSize * 0.35f,
+                                  preMod * 0.25f, reverbDiffusion);
+        else if (algorithmValue == 2)
             reverb.processGravityPlaceholder (tankInL, tankInR, wetL, wetR, reverbDecay, reverbLo, 0.2f + reverbSize * 4.0f, reverbDiffusion, reverbHi);
         else if (algorithmValue == 3)
             reverb.processHall78 (tankInL, tankInR, wetL, wetR, reverbDecay, reverbLo, reverbHi, reverbSize, preMod, reverbDiffusion);
+        else if (algorithmValue == 4)
+            reverb.processCathedra (tankInL, tankInR, wetL, wetR, reverbDecay, reverbSize,
+                                    juce::jlimit (0.0f, 1.0f, reverbDiffusion + 0.18f),
+                                    reverbLo, reverbHi, reverbPitch + 7.0f, juce::jlimit (0.0f, 1.0f, reverbPitchMix + 0.35f));
+        else if (algorithmValue == 5)
+            reverb.processHall78 (tankInL - tankInR * 0.45f, tankInR - tankInL * 0.45f, wetL, wetR,
+                                  reverbDecay * 0.48f, reverbLo, reverbHi * 0.55f,
+                                  0.18f + reverbSize * 0.25f, preMod + 0.28f, reverbDiffusion * 0.42f);
         else
             reverb.processCathedra (tankInL, tankInR, wetL, wetR, reverbDecay, reverbSize, reverbDiffusion,
                                     reverbLo, reverbHi, reverbPitch, reverbPitchMix);
@@ -342,6 +371,7 @@ OrbitfallAudioProcessor::APVTS::ParameterLayout OrbitfallAudioProcessor::createP
     addFloat ("wet_trim", "Wet Trim", 0.0f, 1.0f, 0.26f);
     addBool ("spillover", "Spillover", true);
     addBool ("trails", "Trails", true);
+    addBool ("bypass", "Bypass", false);
 
     return { params.begin(), params.end() };
 }
@@ -349,7 +379,7 @@ OrbitfallAudioProcessor::APVTS::ParameterLayout OrbitfallAudioProcessor::createP
 void OrbitfallAudioProcessor::DelayLine::prepare (double newSampleRate, double maxSeconds)
 {
     sampleRate = newSampleRate;
-    buffer.setSize (1, (int) std::ceil (48000.0 * maxSeconds) + 8);
+    buffer.setSize (1, (int) std::ceil (sampleRate * maxSeconds) + 8);
     reset();
 }
 

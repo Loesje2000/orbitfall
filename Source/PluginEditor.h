@@ -70,10 +70,13 @@ private:
 
     OrbitfallAudioProcessor& audioProcessor;
     LookAndFeel lookAndFeel;
+    juce::TooltipWindow tooltipWindow { this, 650 };
 
     juce::Label logo;
     juce::Label title;
     juce::Label hint;
+    juce::ToggleButton bypassButton;
+    std::unique_ptr<ButtonAttachment> bypassAttachment;
 
     std::vector<std::unique_ptr<Knob>> knobs;
     std::vector<std::unique_ptr<Toggle>> toggles;

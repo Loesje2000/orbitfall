@@ -6,6 +6,47 @@ juce::Font makeFont (float height, juce::Font::FontStyleFlags style = juce::Font
 {
     return juce::Font (juce::FontOptions { height, style });
 }
+
+juce::String tooltipForParam (const juce::String& paramID)
+{
+    if (paramID == "reverb_algorithm") return "Selects the reverb voice: Cathedra, Ultraplate, Gravity, 78 Hall, Prism, or Spring.";
+    if (paramID == "reverb_decay") return "Sets how long the reverb tail sustains.";
+    if (paramID == "reverb_size") return "Changes the apparent tank or room size.";
+    if (paramID == "reverb_diffusion") return "Controls echo density and how quickly reflections smear together.";
+    if (paramID == "reverb_lo_freq") return "Shapes low-frequency weight in the reverb.";
+    if (paramID == "reverb_hi_freq") return "Shapes high-frequency damping and brightness.";
+    if (paramID == "reverb_pitch") return "Offsets the pitch-shifted shimmer path in semitones.";
+    if (paramID == "reverb_pitch_mix") return "Blends the pitch-shifted shimmer path into the main reverb.";
+    if (paramID == "pre_type") return "Chooses the predelay character: tape, BBD, or clean digital.";
+    if (paramID == "pre_time") return "Sets the predelay time before the signal enters the reverb tank.";
+    if (paramID == "pre_feedback") return "Feeds the reverb output back into the predelay for repeats and bloom.";
+    if (paramID == "pre_crossfeed") return "Crosses the left and right predelay channels for stereo motion.";
+    if (paramID == "pre_mod") return "Adds modulation to predelay time for drift and movement.";
+    if (paramID == "pre_half_speed") return "Runs the predelay write path at half speed for darker, longer movement.";
+    if (paramID == "pre_dry_blend") return "Blends dry input directly into the reverb tank.";
+    if (paramID == "gate_attack") return "Sets how quickly the reverb gate opens.";
+    if (paramID == "gate_hold") return "Sets how long the gate stays open before decay.";
+    if (paramID == "gate_decay") return "Sets how quickly the gate closes.";
+    if (paramID == "insert_type") return "Chooses the processor placed in the wet feedback path.";
+    if (paramID == "insert_amount") return "Controls how strongly the feedback insert changes the wet signal.";
+    if (paramID == "insert_mix") return "Blends the feedback insert with the unprocessed wet signal.";
+    if (paramID == "insert_param") return "Adjusts the main character parameter for the selected feedback insert.";
+    if (paramID == "mod_a_type" || paramID == "mod_b_type") return "Chooses the modulation source shape: LFO, envelope, sample and hold, or sequencer.";
+    if (paramID == "mod_a_rate" || paramID == "mod_b_rate") return "Sets the modulation speed.";
+    if (paramID == "mod_a_depth" || paramID == "mod_b_depth") return "Sets how strongly the modulation moves its target.";
+    if (paramID == "mod_a_target" || paramID == "mod_b_target") return "Chooses the parameter this modulation lane controls.";
+    if (paramID == "hazy_age") return "Adds subtle age noise and saturation.";
+    if (paramID == "hazy_warble") return "Adds slow unstable pitch and level wobble.";
+    if (paramID == "hazy_decimate") return "Reduces temporal resolution for grainier repeats.";
+    if (paramID == "hazy_mix") return "Blends the hazy degradation processor into the wet path.";
+    if (paramID == "mix") return "Blends dry signal with processed reverb.";
+    if (paramID == "dry_trim") return "Adjusts dry output level.";
+    if (paramID == "wet_trim") return "Adjusts wet output level.";
+    if (paramID == "spillover") return "Keeps the reverb memory active across preset-style changes.";
+    if (paramID == "trails") return "Lets the reverb tail continue naturally instead of cutting off.";
+    if (paramID == "bypass") return "Bypasses Orbitfall and passes the input through unchanged.";
+    return {};
+}
 }
 
 OrbitfallAudioProcessorEditor::LookAndFeel::LookAndFeel (const Palette& p)
@@ -102,7 +143,7 @@ OrbitfallAudioProcessorEditor::OrbitfallAudioProcessorEditor (OrbitfallAudioProc
 {
     setLookAndFeel (&lookAndFeel);
     setResizable (true, true);
-    setResizeLimits (820, 600, 1400, 900);
+    setResizeLimits (980, 800, 1500, 1000);
 
     logo.setText ("Rubblesonic", juce::dontSendNotification);
     logo.setColour (juce::Label::textColourId, colours.sage);
@@ -125,6 +166,12 @@ OrbitfallAudioProcessorEditor::OrbitfallAudioProcessorEditor (OrbitfallAudioProc
     addProgramButton ("<", 0);
     addProgramButton ("Cathedra dark", 0);
     addProgramButton (">", 1);
+
+    bypassButton.setButtonText ("bypass");
+    bypassButton.setColour (juce::ToggleButton::textColourId, colours.text);
+    bypassButton.setTooltip (tooltipForParam ("bypass"));
+    bypassAttachment = std::make_unique<ButtonAttachment> (audioProcessor.parameters, "bypass", bypassButton);
+    addAndMakeVisible (bypassButton);
 
     algorithm = &addChoice ("reverb_algorithm", { "cathedra", "ultraplate", "gravity", "78 hall", "prism", "spring" });
     addKnob ("decay", "reverb_decay", 56.0f);
@@ -170,7 +217,7 @@ OrbitfallAudioProcessorEditor::OrbitfallAudioProcessorEditor (OrbitfallAudioProc
     addToggle ("spillover", "spillover");
     addToggle ("trails", "trails");
 
-    setSize (980, 660);
+    setSize (1120, 860);
 }
 
 OrbitfallAudioProcessorEditor::Knob& OrbitfallAudioProcessorEditor::addKnob (const juce::String& text,
@@ -186,6 +233,8 @@ OrbitfallAudioProcessorEditor::Knob& OrbitfallAudioProcessorEditor::addKnob (con
     knob->label.setJustificationType (juce::Justification::centred);
     knob->label.setColour (juce::Label::textColourId, diameter < 40.0f ? colours.muted : colours.text);
     knob->label.setFont (makeFont (11.0f));
+    knob->slider.setTooltip (tooltipForParam (paramID));
+    knob->label.setTooltip (tooltipForParam (paramID));
     knob->attachment = std::make_unique<SliderAttachment> (audioProcessor.parameters, paramID, knob->slider);
     addAndMakeVisible (knob->slider);
     addAndMakeVisible (knob->label);
@@ -199,6 +248,7 @@ OrbitfallAudioProcessorEditor::Toggle& OrbitfallAudioProcessorEditor::addToggle 
     auto toggle = std::make_unique<Toggle>();
     toggle->button.setButtonText (text);
     toggle->button.setColour (juce::ToggleButton::textColourId, colours.text);
+    toggle->button.setTooltip (tooltipForParam (paramID));
     toggle->attachment = std::make_unique<ButtonAttachment> (audioProcessor.parameters, paramID, toggle->button);
     addAndMakeVisible (toggle->button);
     toggles.push_back (std::move (toggle));
@@ -211,6 +261,7 @@ OrbitfallAudioProcessorEditor::Choice& OrbitfallAudioProcessorEditor::addChoice 
     auto choice = std::make_unique<Choice>();
     choice->box.addItemList (items, 1);
     choice->box.setJustificationType (juce::Justification::centred);
+    choice->box.setTooltip (tooltipForParam (paramID));
     choice->attachment = std::make_unique<ComboAttachment> (audioProcessor.parameters, paramID, choice->box);
     addAndMakeVisible (choice->box);
     choices.push_back (std::move (choice));
@@ -222,6 +273,7 @@ juce::TextButton& OrbitfallAudioProcessorEditor::addProgramButton (const juce::S
     auto button = std::make_unique<juce::TextButton> (text);
     button->setColour (juce::TextButton::textColourOffId, colours.text);
     button->setColour (juce::TextButton::buttonColourId, colours.dark);
+    button->setTooltip (programIndex == 1 ? "Load the next factory preset." : "Load the first factory preset.");
     button->onClick = [this, programIndex]
     {
         const auto next = programIndex == 1 ? (audioProcessor.getCurrentProgram() + 1) % audioProcessor.getNumPrograms() : programIndex;
@@ -238,7 +290,7 @@ void OrbitfallAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (colours.background);
     g.setColour (juce::Colours::black.withAlpha (0.18f));
-    g.fillRect (getLocalBounds().withTrimmedTop (48));
+    g.fillRect (getLocalBounds().withTrimmedTop (54));
 
     paintSection (g, reverbArea, "reverb");
     paintSection (g, predelayArea, "predelay");
@@ -264,40 +316,41 @@ void OrbitfallAudioProcessorEditor::resized()
         return;
 
     auto area = getLocalBounds().reduced (18);
-    auto header = area.removeFromTop (40);
+    auto header = area.removeFromTop (46);
     logo.setBounds (header.removeFromLeft (124));
-    logo.setTransform (juce::AffineTransform::rotation (juce::degreesToRadians (-6.0f), 42.0f, 20.0f));
+    logo.setTransform (juce::AffineTransform::rotation (juce::degreesToRadians (-6.0f), 42.0f, 23.0f));
     title.setBounds (header.removeFromLeft (140));
 
+    bypassButton.setBounds (header.removeFromRight (104).reduced (4, 6));
+    header.removeFromRight (10);
     auto preset = header.removeFromRight (290);
     programButtons[0]->setBounds (preset.removeFromLeft (34).reduced (2));
     programButtons[1]->setBounds (preset.removeFromLeft (190).reduced (2));
     programButtons[2]->setBounds (preset.removeFromLeft (34).reduced (2));
 
-    reverbArea = area.removeFromTop (144).reduced (0, 4);
-    auto middle = area.removeFromTop (156);
+    reverbArea = area.removeFromTop (204).reduced (0, 4);
+    auto middle = area.removeFromTop (188);
     predelayArea = middle.removeFromLeft (middle.getWidth() / 2).reduced (0, 4);
     gateArea = middle.reduced (8, 4);
-    modArea = area.removeFromTop (140).reduced (0, 4);
-    outputArea = area.removeFromTop (118).reduced (0, 4);
+    modArea = area.removeFromTop (166).reduced (0, 4);
+    outputArea = area.removeFromTop (150).reduced (0, 4);
     hint.setBounds (area.reduced (0, 2));
 
     auto r = reverbArea.reduced (14, 28);
     algorithm->box.setBounds (r.removeFromTop (28));
-    auto primary = r.removeFromTop (64);
-    layoutKnobs (primary, { knobs[0].get(), knobs[1].get(), knobs[2].get() });
-    layoutKnobs (r, { knobs[3].get(), knobs[4].get(), knobs[5].get(), knobs[6].get() });
+    r.removeFromTop (8);
+    layoutKnobs (r, { knobs[0].get(), knobs[1].get(), knobs[2].get(), knobs[3].get(), knobs[4].get(), knobs[5].get(), knobs[6].get() });
 
     auto p = predelayArea.reduced (14, 28);
     preType->box.setBounds (p.removeFromTop (26).removeFromLeft (210));
-    layoutKnobs (p.removeFromTop (70), { knobs[7].get(), knobs[8].get(), knobs[9].get(), knobs[10].get() });
-    toggles[0]->button.setBounds (p.removeFromLeft (120).reduced (0, 8));
-    layoutKnobs (p.removeFromLeft (92), { knobs[11].get() });
+    p.removeFromTop (8);
+    layoutKnobs (p.removeFromTop (92), { knobs[7].get(), knobs[8].get(), knobs[9].get(), knobs[10].get(), knobs[11].get() });
+    toggles[0]->button.setBounds (p.removeFromLeft (132).reduced (0, 4));
 
     auto g = gateArea.reduced (14, 28);
-    layoutKnobs (g.removeFromTop (68), { knobs[12].get(), knobs[13].get(), knobs[14].get() });
-    insertType->box.setBounds (g.removeFromTop (26).removeFromLeft (180));
-    layoutKnobs (g, { knobs[15].get(), knobs[16].get(), knobs[17].get() });
+    insertType->box.setBounds (g.removeFromTop (26).removeFromLeft (230));
+    g.removeFromTop (8);
+    layoutKnobs (g, { knobs[12].get(), knobs[13].get(), knobs[14].get(), knobs[15].get(), knobs[16].get(), knobs[17].get() });
 
     auto m = modArea.reduced (14, 28);
     auto colW = m.getWidth() / 3;
@@ -305,10 +358,12 @@ void OrbitfallAudioProcessorEditor::resized()
     auto mb = m.removeFromLeft (colW).reduced (10, 2);
     auto hz = m.reduced (10, 2);
     modAType->box.setBounds (ma.removeFromTop (26));
-    layoutKnobs (ma.removeFromLeft (126), { knobs[18].get(), knobs[19].get() });
+    ma.removeFromTop (4);
+    layoutKnobs (ma.removeFromTop (72), { knobs[18].get(), knobs[19].get() });
     modATarget->box.setBounds (ma.removeFromTop (26).reduced (4, 0));
     modBType->box.setBounds (mb.removeFromTop (26));
-    layoutKnobs (mb.removeFromLeft (126), { knobs[20].get(), knobs[21].get() });
+    mb.removeFromTop (4);
+    layoutKnobs (mb.removeFromTop (72), { knobs[20].get(), knobs[21].get() });
     modBTarget->box.setBounds (mb.removeFromTop (26).reduced (4, 0));
     layoutKnobs (hz, { knobs[22].get(), knobs[23].get(), knobs[24].get(), knobs[25].get() });
 
@@ -331,9 +386,9 @@ void OrbitfallAudioProcessorEditor::layoutKnobs (juce::Rectangle<int> area, std:
     {
         auto cell = area.withX (area.getX() + index * cellW).withWidth (cellW).reduced (4, 0);
         const auto diameter = knob->slider.getName().getFloatValue();
-        auto sliderArea = cell.removeFromTop ((int) diameter + 20).withSizeKeepingCentre ((int) diameter + 18, (int) diameter + 20);
-        knob->slider.setBounds (sliderArea);
         knob->label.setBounds (cell.removeFromTop (18));
+        auto sliderArea = cell.removeFromTop ((int) diameter + 22).withSizeKeepingCentre ((int) diameter + 18, (int) diameter + 22);
+        knob->slider.setBounds (sliderArea);
         ++index;
     }
 }
