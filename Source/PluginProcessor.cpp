@@ -432,8 +432,16 @@ void OrbitfallAudioProcessor::PredelayEngine::processSample (float inL, float in
     const auto lfo = type == tape ? tapeLfo : (type == bbd ? bbdLfo : digitalLfo);
     const auto delaySamples = timeMs * 0.001f * (float) sampleRate;
 
-    auto rawL = left.read (delaySamples, depthSamples * lfo, halfSpeed);
-    auto rawR = right.read (delaySamples * 1.013f, -depthSamples * lfo, halfSpeed);
+    // Read both rates during a half-speed transition. Switching the tap
+    // directly changes its delay time abruptly and produces a click; the
+    // 50 ms SmoothedValue lets the two taps trade places gracefully.
+    const auto halfAmount = halfBlend.getNextValue();
+    const auto normalL = left.read (delaySamples, depthSamples * lfo, false);
+    const auto normalR = right.read (delaySamples * 1.013f, -depthSamples * lfo, false);
+    const auto halfL = left.read (delaySamples, depthSamples * lfo, true);
+    const auto halfR = right.read (delaySamples * 1.013f, -depthSamples * lfo, true);
+    auto rawL = juce::jmap (halfAmount, normalL, halfL);
+    auto rawR = juce::jmap (halfAmount, normalR, halfR);
 
     if (type == bbd)
     {
