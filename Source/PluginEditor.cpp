@@ -132,6 +132,13 @@ void OrbitfallAudioProcessorEditor::LookAndFeel::drawComboBox (juce::Graphics& g
     g.fillPath (arrow);
 }
 
+juce::PopupMenu::Options OrbitfallAudioProcessorEditor::LookAndFeel::getOptionsForComboBoxPopupMenu (juce::ComboBox& box,
+                                                                                                   juce::Label& label)
+{
+    return juce::LookAndFeel_V4::getOptionsForComboBoxPopupMenu (box, label)
+        .withParentComponent (box.getTopLevelComponent());
+}
+
 juce::Font OrbitfallAudioProcessorEditor::LookAndFeel::getLabelFont (juce::Label& label)
 {
     return makeFont (label.getName() == "section" ? 13.0f : 11.0f,
